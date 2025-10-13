@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Front Desk — Semi-dynamic Dashboard</title>
+<style>
+  :root{
+    --nav-blue:#153d8b;
+    --nav-blue-2:#0f3a86;
+    --accent:#1e90ff;
+    --card:#ffffff;
+    --bg:#e6edf8;
+    --muted:#6b7280;
+  }
+  *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  body{margin:0;background:var(--bg);color:#0b1220}
+  /* SIDEBAR */
+  .wrap{display:flex;min-height:100vh}
+  aside{
+    width:220px;background:linear-gradient(180deg,var(--nav-blue),var(--nav-blue-2));color:white;padding:28px 18px;
+    display:flex;flex-direction:column;gap:18px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+  .brand .logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#74b9ff,#1e90ff);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+  nav .nav-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:8px;color:rgba(255,255,255,0.9);cursor:pointer}
+  nav .nav-item.active{background:rgba(255,255,255,0.07)}
+  nav .nav-item:hover{background:rgba(255,255,255,0.04)}
+  .divider{height:1px;background:rgba(255,255,255,0.06);margin:8px 0;border-radius:2px}
+
+  /* MAIN */
+  main{flex:1;padding:22px 28px}
+  header.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+  .search{display:flex;align-items:center;gap:12px;background:white;padding:8px 12px;border-radius:10px;box-shadow:0 4px 12px rgba(12,20,40,0.06)}
+  .search input{border:0;outline:0;font-size:14px}
+  .top-actions{display:flex;align-items:center;gap:12px}
+  .user{display:flex;align-items:center;gap:10px;background:white;padding:6px 10px;border-radius:10px}
+  .user img{width:36px;height:36px;border-radius:50%}
+
+  /* GRID */
+  .grid{display:grid;grid-template-columns:360px 1fr 360px;gap:20px;margin-top:10px}
+  @media (max-width:1000px){ .grid{grid-template-columns:1fr; } aside{display:none} .wrap{min-height:unset} main{padding:14px} }
+
+  /* FRONT DESK CARD (left column) */
+  .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(13,18,30,0.06)}
+  .room-photo{width:100%;height:200px;border-radius:10px;background-size:cover;background-position:center;margin-bottom:14px}
+  .room-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .room-meta .room-info{display:flex;flex-direction:column}
+  .badge{padding:6px 10px;border-radius:8px;font-weight:600}
+  .badge.checked{background:linear-gradient(90deg,#2ecc71,#21bf73);color:white}
+  .badge.wait{background:linear-gradient(90deg,#ffb86b,#ff8a65);color:white}
+  .guest-row{display:flex;gap:12px;align-items:center}
+  .guest-row img{width:64px;height:64px;border-radius:10px;object-fit:cover}
+  .guest-actions{display:flex;gap:8px;margin-top:12px}
+  .btn{padding:8px 12px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+  .btn.primary{background:var(--accent);color:white}
+  .btn.ghost{background:transparent;border:1px solid #e6eefc;color:var(--accent)}
+  .small{font-size:13px;color:var(--muted)}
+
+  /* middle column (main board) */
+  .board-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .board-title{font-size:20px;font-weight:700}
+  .stat-row{display:flex;gap:12px;margin-top:12px}
+  .stat{background:linear-gradient(180deg,#ffffff,#f7fbff);padding:12px;border-radius:10px;min-width:140px;text-align:center;box-shadow:0 6px 16px rgba(12,20,40,0.04)}
+  .stat .num{font-size:20px;font-weight:700;color:var(--nav-blue-2)}
+  .activity-feed{margin-top:16px}
+  .feed-item{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:white;margin-bottom:10px;box-shadow:0 6px 12px rgba(12,20,40,0.04);transform:translateX(0);opacity:1}
+  .feed-item.fade-in{animation:feedIn 0.5s ease}
+  @keyframes feedIn{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .feed-color{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+  .green{background:linear-gradient(45deg,#53d4a0,#2ecc71)}
+  .red{background:linear-gradient(45deg,#ff7b7b,#ff5c5c)}
+  .feed-body .who{font-weight:700}
+  .feed-body .what{font-size:13px;color:var(--muted)}
+
+  /* right column widgets */
+  .widget{background:var(--card);padding:12px;border-radius:10px}
+  .mini-stats{display:flex;gap:10px}
+  .mini-stats .tile{flex:1;padding:12px;border-radius:8px;background:linear-gradient(180deg,#fbfeff,#f4fbff);text-align:center}
+  .label{font-size:13px;color:var(--muted)}
+
+  /* tiny animation for success toast */
+  .toast{position:fixed;right:18px;bottom:18px;background:linear-gradient(90deg,#1eab6f,#23d27a);color:white;padding:12px 16px;border-radius:10px;box-shadow:0 8px 26px rgba(2,17,12,0.2);opacity:0;transform:translateY(10px);transition:all .3s}
+  .toast.show{opacity:1;transform:translateY(0)}
+  .controls-row{display:flex;gap:8px;align-items:center}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px}
+  .switch{width:36px;height:20px;background:#e6eefc;border-radius:999px;position:relative}
+  .switch .dot{position:absolute;top:3px;left:3px;width:14px;height:14px;background:white;border-radius:50%;transition:all .25s}
+  .switch.on{background:linear-gradient(90deg,#7bd389,#3cc07a)}
+  .switch.on .dot{left:19px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand"><div class="logo">FD</div> Front Desk</div>
+    <nav>
+      <div class="nav-item active" data-sec="dashboard" onclick="navTo(event)">🏠 Dashboard</div>
+      <div class="nav-item" data-sec="frontdesk" onclick="navTo(event)">🧾 Front Desk</div>
+      <div class="nav-item" data-sec="reservations" onclick="navTo(event)">📅 Reservations</div>
+      <div class="nav-item" data-sec="orders" onclick="navTo(event)">🍽 Orders</div>
+      <div class="nav-item" data-sec="housekeeping" onclick="navTo(event)">🧹 Housekeeping</div>
+    </nav>
+    <div class="divider"></div>
+    <div class="small">Management</div>
+    <nav>
+      <div class="nav-item" data-sec="rooms" onclick="navTo(event)">🛏 Rooms</div>
+      <div class="nav-item" data-sec="rates" onclick="navTo(event)">💲 Room Rates</div>
+      <div class="nav-item" data-sec="stats" onclick="navTo(event)">📊 Statistics</div>
+    </nav>
+    <div style="flex:1"></div>
+    <div class="small">v1.0 • Demo</div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div class="search">
+        <svg width="18" height="18" fill="#98a0b3" viewBox="0 0 24 24"><path d="M21 20l-5.6-5.6a7 7 0 10-1.4 1.4L20 21zM10 16a6 6 0 110-12 6 6 0 010 12z"/></svg>
+        <input placeholder="Search guests, rooms, orders..." />
+      </div>
+
+<div id="greetingWidget" style="display:flex;align-items:center;gap:14px;background:white;padding:8px 14px;border-radius:10px;box-shadow:0 4px 10px rgba(12,20,40,0.06)">
+  <div>
+    <div id="welcomeMsg" style="font-weight:600">Welcome!</div>
+    <div id="clock" style="font-size:13px;color:#6b7280">--:-- --</div>
+  </div>
+  <div id="weather" style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6b7280">
+    <span id="weatherIcon">🌤</span>
+    <span id="weatherText">Loading...</span>
+  </div>
+</div>
+
+
+      <div class="top-actions">
+        <div class="controls-row">
+          <div class="toggle">
+            <label class="small">Simulate Live Activity</label>
+            <div id="simSwitch" class="switch" onclick="toggleSim()"><div class="dot"></div></div>
+          </div>
+          <button class="btn ghost" title="Add quick guest" onclick="openQuickAdd()">➕ Quick Add</button>
+        </div>
+        <div class="user"><img src="https://i.pravatar.cc/60?img=12"><div style="padding-right:8px">Aruvi Nikolay</div></div>
+      </div>
+    </header>
+
+    <section id="dashboard" class="panel">
+      <div class="grid">
+        <!-- LEFT: Front desk card -->
+        <div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700;font-size:16px">Room #109</div>
+                <div class="small">Phone: +69 6666 9999</div>
+              </div>
+              <div class="badge checked" id="roomStatus">Checked In</div>
+            </div>
+
+            <div class="room-photo" id="roomPhoto" style="background-image:url('https://picsum.photos/600/380?random=33')"></div>
+
+            <div class="room-meta">
+              <div class="room-info">
+                <div class="small">Guest</div>
+                <div style="font-weight:700">Kirara Asahi</div>
+                <div class="small">kirara@domain.com</div>
+              </div>
+              <div style="text-align:right">
+                <div class="small">Checked In</div>
+                <div style="font-weight:700">12 Sept, 2023</div>
+                <div class="small" style="margin-top:6px">Checked Out</div>
+                <div style="font-weight:700">14 Sept, 2023</div>
+              </div>
+            </div>
+
+            <div style="margin-top:8px">
+              <div class="guest-row">
+                <img src="https://i.pravatar.cc/120?img=47" alt="guest">
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                      <div style="font-weight:700">Kirara Asahi</div>
+                      <div class="small">VIP • Breakfast: English Tea • Capacity 2</div>
+                    </div>
+                    <div style="text-align:right">
+                      <div class="small">Arrival</div>
+                      <div style="font-weight:700">12 Sep • 14:00</div>
+                    </div>
+                  </div>
+
+                  <div class="guest-actions">
+                    <button class="btn primary" onclick="checkInCurrent()">Check In</button>
+                    <button class="btn ghost" onclick="checkOutCurrent()">Check Out</button>
+                    <button class="btn" style="background:#f3f4f6">More</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:14px"></div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:700">Quick Controls</div>
+              <div class="small">Actions</div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn ghost" onclick="fakeActivity('checkin')">Fake Check-In</button>
+              <button class="btn ghost" onclick="fakeActivity('checkout')">Fake Check-Out</button>
+              <button class="btn ghost" onclick="clearFeed()">Clear Feed</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MIDDLE: Activity board -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="board-title">Activity</div>
+            <div class="small">Live feed of recent front desk events</div>
+          </div>
+
+          <div class="stat-row">
+            <div class="stat">
+              <div class="label">Today Visitors</div>
+              <div class="num" id="statToday">13</div>
+            </div>
+            <div class="stat">
+              <div class="label">Checked In</div>
+              <div class="num" id="statIn">5</div>
+            </div>
+            <div class="stat">
+              <div class="label">Checked Out</div>
+              <div class="num" id="statOut">8</div>
+            </div>
+          </div>
+
+          <div class="activity-feed" id="feed">
+            <!-- feed items injected here -->
+          </div>
+        </div>
+
+        <!-- RIGHT: widgets -->
+        <div>
+          <div class="widget card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:700">Today</div>
+              <div class="small">Summary</div>
+            </div>
+            <div style="height:12px"></div>
+            <div class="mini-stats">
+              <div class="tile">
+                <div class="small">New</div>
+                <div style="font-weight:700;font-size:20px;color:#1e7be0" id="tileNew">4</div>
+              </div>
+              <div class="tile">
+                <div class="small">Returning</div>
+                <div style="font-weight:700;font-size:20px;color:#ff8a65" id="tileRet">6</div>
+              </div>
+              <div class="tile">
+                <div class="small">VIP</div>
+                <div style="font-weight:700;font-size:20px;color:#34c77b" id="tileVip">3</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="widget card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:700">Latest Guest</div>
+              <div class="small">Recent</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+              <img src="https://i.pravatar.cc/60?img=3" style="width:64px;height:64px;border-radius:8px;object-fit:cover">
+              <div>
+                <div style="font-weight:700">Aruvi Nikolay</div>
+                <div class="small">Checked in • 2m ago</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- other sections placeholders -->
+    <section id="frontdesk" style="display:none">
+      <div class="card">Front Desk form, register visitors, bulk check out, etc (placeholder)</div>
+    </section>
+    <section id="reservations" style="display:none"><div class="card">Reservations</div></section>
+    <section id="orders" style="display:none"><div class="card">Orders</div></section>
+    <section id="housekeeping" style="display:none"><div class="card">Housekeeping</div></section>
+
+    <div id="toast" class="toast">Action completed</div>
+  </main>
+</div>
+
+<script>
+  // ---------- Data & state ----------
+  const state = {
+    statToday: 13, statIn: 5, statOut: 8,
+    feed: [], // {type:"checkin"|"checkout", who, time, detail}
+    simOn: false,
+    currentGuest: {
+      name: "Kirara Asahi",
+      email: "kirara@domain.com",
+      photo: "https://i.pravatar.cc/120?img=47",
+      room: "109",
+      status: "checkedin",
+      arrival: "12 Sept • 14:00",
+      checkout: "14 Sept, 2023"
+    }
+  };
+
+  // Initial render
+  document.getElementById('statToday').textContent = state.statToday;
+  document.getElementById('statIn').textContent = state.statIn;
+  document.getElementById('statOut').textContent = state.statOut;
+
+  // Pre-populate feed with sample items
+  const seed = [
+    {type:'checkin', who:'Aruvi Nikolay', when:'2 minutes ago', detail:'Checked in to Room 210'},
+    {type:'checkout', who:'Dean Ferrera', when:'10 minutes ago', detail:'Checked out from Room 109'},
+    {type:'checkin', who:'Kathy Mangiar', when:'40 minutes ago', detail:'Checked in to Room 305'}
+  ];
+  seed.forEach(s => addFeedItem(s));
+
+  // ---------- UI Helpers ----------
+  function navTo(e){
+    const all = document.querySelectorAll('nav .nav-item');
+    all.forEach(a=>a.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    // hide all sections
+    document.querySelectorAll('main section').forEach(s=>s.style.display='none');
+    const sec = e.currentTarget.dataset.sec || 'dashboard';
+    const el = document.getElementById(sec);
+    if(el) el.style.display = 'block';
+  }
+
+  function showToast(text='Saved'){
+    const t = document.getElementById('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),2600);
+  }
+
+  function renderCurrentGuest(){
+    // update guest info on left card
+    const g = state.currentGuest;
+    document.querySelector('.room-photo').style.backgroundImage = `url('${g.photo}?v=${Date.now()}')`;
+    document.querySelector('.room-meta .room-info div').textContent = g.name;
+    // status badge
+    const badge = document.getElementById('roomStatus');
+    if(g.status === 'checkedin'){ badge.className='badge checked'; badge.textContent='Checked In'; }
+    else if(g.status === 'checkedout'){ badge.className='badge wait'; badge.textContent='Checked Out'; }
+    else { badge.className='badge'; badge.textContent='Available'; }
+  }
+  renderCurrentGuest();
+
+  // ---------- Feed management ----------
+  function addFeedItem({type, who, when=null, detail=null}){
+    const id = Math.random().toString(36).slice(2,9);
+    const time = when || timeAgo(new Date());
+    const item = {id, type, who, time, detail};
+    state.feed.unshift(item); // newest first
+    renderFeed();
+  }
+
+  function renderFeed(){
+    const feed = document.getElementById('feed');
+    feed.innerHTML = '';
+    state.feed.slice(0,50).forEach(it=>{
+      const div = document.createElement('div');
+      div.className = 'feed-item fade-in';
+      div.innerHTML = `
+        <div class="feed-color ${it.type==='checkin'?'green':'red'}">${it.who.split(' ').map(n=>n[0]).slice(0,2).join('')}</div>
+        <div class="feed-body">
+          <div class="who">${it.who} <span style="font-weight:600;color:var(--muted);">• ${it.time}</span></div>
+          <div class="what">${it.type==='checkin'?'Checked in':'Checked out'}${it.detail?(' — '+it.detail):''}</div>
+        </div>
+      `;
+      feed.appendChild(div);
+    });
+  }
+
+  function clearFeed(){ state.feed=[]; renderFeed(); showToast('Feed cleared') }
+
+  // ---------- Actions (Check in/out) ----------
+  function checkInCurrent(){
+    state.currentGuest.status = 'checkedin';
+    state.statIn += 1; state.statToday += 1;
+    document.getElementById('statIn').textContent = state.statIn;
+    document.getElementById('statToday').textContent = state.statToday;
+    addFeedItem({type:'checkin', who: state.currentGuest.name, detail:`to Room ${state.currentGuest.room}`, when: 'just now'});
+    renderCurrentGuest();
+    showToast('Guest checked in');
+    // Hook: send to server / Google Apps Script
+    // sendToServer({action:'checkin', guest: state.currentGuest, time: new Date().toISOString()});
+  }
+
+  function checkOutCurrent(){
+    state.currentGuest.status = 'checkedout';
+    state.statOut += 1; 
+    document.getElementById('statOut').textContent = state.statOut;
+    addFeedItem({type:'checkout', who: state.currentGuest.name, detail:`from Room ${state.currentGuest.room}`, when: 'just now'});
+    renderCurrentGuest();
+    showToast('Guest checked out');
+    // Hook: sendToServer({action:'checkout', guest: state.currentGuest, time: new Date().toISOString()});
+  }
+
+  // Quick-add modal (simple prompt flow)
+  function openQuickAdd(){
+    const name = prompt('Guest full name (e.g. John Doe)');
+    if(!name) return;
+    const room = prompt('Room number', '200');
+    const email = prompt('Email', `${name.split(' ')[0].toLowerCase()}@example.com`);
+    const g = {name, email, photo:`https://i.pravatar.cc/120?u=${encodeURIComponent(email)}`, room, status:'checkedin', arrival: new Date().toLocaleString()};
+    state.currentGuest = g;
+    renderCurrentGuest();
+    addFeedItem({type:'checkin', who: g.name, detail:`to Room ${g.room}`, when:'just now'});
+    state.statToday +=1; state.statIn +=1;
+    document.getElementById('statToday').textContent = state.statToday;
+    document.getElementById('statIn').textContent = state.statIn;
+    showToast('Quick guest added & checked in');
+    // sendToServer({action:'checkin', guest:g});
+  }
+
+  // Fake events (manual or simulation)
+  const sampleNames = ['Samuel Brooks','Mia Tanaka','Omar Abdi','Lina Kim','Carlos Mendez','Aisha Conteh'];
+  function fakeActivity(kind){
+    const who = sampleNames[Math.floor(Math.random()*sampleNames.length)];
+    if(kind==='checkin'){
+      state.statToday++; state.statIn++;
+      document.getElementById('statToday').textContent = state.statToday;
+      document.getElementById('statIn').textContent = state.statIn;
+      addFeedItem({type:'checkin', who, detail:`to Room ${100+Math.floor(Math.random()*200)}`, when:'just now'});
+    } else {
+      state.statOut++;
+      document.getElementById('statOut').textContent = state.statOut;
+      addFeedItem({type:'checkout', who, detail:`from Room ${100+Math.floor(Math.random()*200)}`, when:'just now'});
+    }
+    showToast(kind==='checkin'?'Fake check-in added':'Fake check-out added');
+  }
+
+  // ---------- Simulation ----------
+  let simTimer = null;
+  function toggleSim(){
+    state.simOn = !state.simOn;
+    const sw = document.getElementById('simSwitch');
+    if(state.simOn){ sw.classList.add('on'); startSim(); }
+    else { sw.classList.remove('on'); stopSim(); }
+  }
+  function startSim(){
+    simTimer = setInterval(()=>{
+      // random event type
+      const kind = Math.random() > 0.4 ? 'checkin' : 'checkout';
+      fakeActivity(kind);
+    }, 8000 + Math.random()*12000);
+  }
+  function stopSim(){ if(simTimer) clearInterval(simTimer); simTimer = null; }
+
+  // helper: time ago
+  function timeAgo(d){
+    const now = new Date(); d = new Date(d||now);
+    const diff = Math.floor((now - d)/1000);
+    if(diff < 60) return `${diff}s ago`;
+    if(diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if(diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
+
+  // ---------- Server Hook (replace URL with your Apps Script web app) ----------
+  async function sendToServer(payload){
+    // Example: send to Google Apps Script Web App endpoint
+    // const url = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+    // try {
+    //   const res = await fetch(url, {
+    //     method:'POST',
+    //     body: JSON.stringify(payload),
+    //     headers: {'Content-Type':'application/json'}
+    //   });
+    //   const data = await res.json();
+    //   console.log('Server saved', data);
+    // } catch(err){ console.warn('send failed', err) }
+  }
+
+  // ---------- initialize rendering ----------
+  renderFeed();
+  renderCurrentGuest();
+
+  // expose for debug / dev console
+  window.fakeActivity = fakeActivity;
+  window.clearFeed = clearFeed;
+  window.checkInCurrent = checkInCurrent;
+  window.checkOutCurrent = checkOutCurrent;
+  window.openQuickAdd = openQuickAdd;
+  window.toggleSim = toggleSim;
+
+
+
+
+// ---------- Weather, Time & Greeting ----------
+async function updateGreeting() {
+  const now = new Date();
+  const hour = now.getHours();
+  let greet = "Welcome";
+  if (hour < 12) greet = "Good morning";
+  else if (hour < 18) greet = "Good afternoon";
+  else greet = "Good evening";
+
+  document.getElementById("welcomeMsg").textContent = `${greet}, Aruvi Nikolay 👋`;
+}
+
+function updateClock() {
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  document.getElementById("clock").textContent = time;
+}
+
+async function fetchWeather() {
+  try {
+    if (!navigator.geolocation) {
+      document.getElementById("weatherText").textContent = "Location unavailable";
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      // 🔑 Replace with your OpenWeatherMap API key
+      const apiKey = "d394b03bf1e389dafa7db779d0b47370";
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data && data.main && data.weather && data.name) {
+        const temp = Math.round(data.main.temp);
+        const desc = data.weather[0].description;
+        const icon = data.weather[0].icon;
+        const city = data.name;
+        const emoji = getWeatherEmoji(icon);
+
+        document.getElementById("weatherIcon").textContent = emoji;
+        document.getElementById("weatherText").innerHTML = `${city}: ${temp}°C, ${desc}`;
+      } else {
+        document.getElementById("weatherText").textContent = "Weather data not available";
+      }
+    });
+  } catch (err) {
+    document.getElementById("weatherText").textContent = "Weather unavailable";
+  }
+}
+
+function getWeatherEmoji(icon) {
+  if (icon.includes("01")) return "☀️";
+  if (icon.includes("02") || icon.includes("03")) return "🌤";
+  if (icon.includes("04")) return "☁️";
+  if (icon.includes("09") || icon.includes("10")) return "🌧";
+  if (icon.includes("11")) return "⛈";
+  if (icon.includes("13")) return "❄️";
+  if (icon.includes("50")) return "🌫";
+  return "🌤";
+}
+
+// Initialize
+updateGreeting();
+updateClock();
+setInterval(updateClock, 1000);
+fetchWeather();
+
+</script>
+</body>
+</html>
